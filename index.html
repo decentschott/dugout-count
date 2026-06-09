@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#16233f">
+<title>Dugout Count</title>
+<style>
+  :root{
+    --bg:#f4f1ea; --panel:#ffffff; --ink:#16233f; --ink2:#4a5673;
+    --gold:#c2a14d; --gold-d:#a9883a; --line:#e6e0d3;
+    --grn:#1f9d57; --grn-bg:#e4f5ea; --amb:#cc7a0a; --amb-bg:#fbeed4;
+    --red:#cf3a3a; --red-bg:#f8e1e1; --gray:#8a8f9c; --gray-bg:#eceae4;
+    --num: ui-monospace, "SF Mono", "Roboto Mono", Menlo, Consolas, monospace;
+    --ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+    --shadow: 0 1px 0 rgba(22,35,63,.04), 0 6px 18px rgba(22,35,63,.08);
+    --safe-b: env(safe-area-inset-bottom, 0px);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;}
+  body{
+    font-family:var(--ui); background:var(--bg); color:var(--ink);
+    -webkit-text-size-adjust:100%; overscroll-behavior:none;
+    background-image:radial-gradient(circle at 18% 12%, rgba(194,161,77,.10), transparent 42%),
+                     radial-gradient(circle at 92% 0%, rgba(22,35,63,.06), transparent 38%);
+  }
+  button{font-family:inherit; color:inherit; cursor:pointer; border:none; background:none;}
+  input,select{font-family:inherit; font-size:16px;}
+  .num{font-family:var(--num); font-variant-numeric:tabular-nums; letter-spacing:-.02em;}
+  .cap{text-transform:uppercase; letter-spacing:.10em; font-weight:800; font-size:11px; color:var(--ink2);}
+
+  /* layout */
+  #app{max-width:520px; margin:0 auto; min-height:100%; padding-bottom:calc(150px + var(--safe-b)); position:relative;}
+  header.top{
+    position:sticky; top:0; z-index:30; background:var(--ink); color:#fff;
+    padding:14px 16px calc(12px); box-shadow:0 4px 14px rgba(22,35,63,.18);
+  }
+  .top .brand{display:flex; align-items:center; gap:9px; font-weight:900; letter-spacing:.04em; font-size:15px;}
+  .top .seam{width:16px;height:16px;border-radius:50%;background:#fff;position:relative;flex:0 0 auto;}
+  .top .seam::before,.top .seam::after{content:"";position:absolute;top:2px;bottom:2px;width:5px;border:1.4px solid var(--red);border-radius:50%;}
+  .top .seam::before{left:-1px;border-right:none;} .top .seam::after{right:-1px;border-left:none;}
+  .ctx{margin-top:9px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;}
+  .ctx .pill{background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.16); border-radius:999px; padding:5px 11px; font-size:12.5px; font-weight:700; display:inline-flex; align-items:center; gap:6px; max-width:100%;}
+  .ctx .pill b{color:var(--gold); font-weight:800;}
+  .ctx .pill .lbl{opacity:.6; font-size:10px; text-transform:uppercase; letter-spacing:.08em;}
+
+  main{padding:16px 14px 8px;}
+  .view{display:none;} .view.active{display:block; animation:fade .18s ease;}
+  @keyframes fade{from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:none}}
+
+  .panel{background:var(--panel); border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow);}
+  .sect-h{display:flex; justify-content:space-between; align-items:center; margin:4px 2px 10px;}
+  .sect-h h2{font-size:13px; text-transform:uppercase; letter-spacing:.12em; margin:0; color:var(--ink2);}
+
+  /* generic controls */
+  .field{margin-bottom:12px;}
+  .field label{display:block; font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; color:var(--ink2); margin-bottom:5px;}
+  .field input[type=text], .field input[type=date], .field input[type=number], .field select{
+    width:100%; padding:13px 12px; border:1.5px solid var(--line); border-radius:11px; background:#fcfbf8; color:var(--ink); font-weight:600;
+  }
+  .field input:focus,.field select:focus{outline:none; border-color:var(--gold);}
+  .btn{display:inline-flex; align-items:center; justify-content:center; gap:7px; font-weight:800; border-radius:12px; padding:13px 16px; font-size:15px; letter-spacing:.01em;}
+  .btn.primary{background:var(--ink); color:#fff;}
+  .btn.gold{background:var(--gold); color:var(--ink);}
+  .btn.ghost{background:#fff; border:1.5px solid var(--line); color:var(--ink);}
+  .btn.danger{background:var(--red-bg); color:var(--red); border:1.5px solid #f0caca;}
+  .btn.block{width:100%;}
+  .btn:active{transform:translateY(1px) scale(.995);}
+  .row{display:flex; gap:10px;} .row>*{flex:1;}
+  .muted{color:var(--ink2); font-size:13px; line-height:1.5;}
+  .empty{text-align:center; color:var(--ink2); padding:34px 18px;}
+  .empty .big{font-size:40px; margin-bottom:6px;}
+
+  /* ===== COUNT VIEW ===== */
+  .picker{display:flex; gap:8px; overflow-x:auto; padding:2px 2px 8px; -webkit-overflow-scrolling:touch; scrollbar-width:none;}
+  .picker::-webkit-scrollbar{display:none;}
+  .pchip{flex:0 0 auto; border:1.5px solid var(--line); background:#fff; border-radius:999px; padding:9px 14px; font-weight:800; font-size:14px; display:flex; align-items:center; gap:7px; white-space:nowrap;}
+  .pchip .n{font-family:var(--num); background:var(--gray-bg); color:var(--ink2); border-radius:6px; padding:1px 6px; font-size:12px;}
+  .pchip.sel{border-color:var(--ink); background:var(--ink); color:#fff;}
+  .pchip.sel .n{background:var(--gold); color:var(--ink);}
+
+  .countcard{margin-top:10px; padding:18px 16px 16px; text-align:center; position:relative; overflow:hidden;}
+  .countcard .who{font-weight:900; font-size:20px; letter-spacing:.01em;}
+  .countcard .gtag{font-size:12px; color:var(--ink2); margin-top:2px; font-weight:600;}
+  .bignum{font-family:var(--num); font-weight:700; font-size:104px; line-height:.95; margin:6px 0 2px; letter-spacing:-.04em;}
+  .bignum.warn{color:var(--amb);} .bignum.over{color:var(--red);}
+  .restline{font-weight:800; font-size:15px; margin-top:2px;}
+  .restline .b{font-family:var(--num);}
+  .tiers{display:flex; gap:8px; justify-content:center; margin-top:12px;}
+  .tier{flex:1; max-width:120px; border:1.5px solid var(--line); border-radius:10px; padding:7px 4px; background:#fcfbf8;}
+  .tier .t1{font-size:10px; text-transform:uppercase; letter-spacing:.07em; color:var(--ink2); font-weight:800;}
+  .tier .t2{font-family:var(--num); font-weight:700; font-size:18px; margin-top:2px;}
+  .tier.day .t2{color:var(--ink);} .tier.evt .t2{color:var(--gold-d);}
+  .nexttier{margin-top:11px; font-size:12.5px; color:var(--ink2); font-weight:600;}
+  .nexttier b{color:var(--amb);}
+
+  /* fixed count controls (thumb zone) */
+  .countpad{position:fixed; left:0; right:0; bottom:calc(64px + var(--safe-b)); z-index:25; padding:0 14px; max-width:520px; margin:0 auto; pointer-events:none;}
+  .countpad .inner{pointer-events:auto; display:flex; gap:10px; align-items:stretch;}
+  .plus{flex:1; background:var(--grn); color:#fff; border-radius:18px; height:92px; font-size:30px; font-weight:900; letter-spacing:.02em; box-shadow:0 8px 22px rgba(31,157,87,.38); display:flex; align-items:center; justify-content:center; gap:10px;}
+  .plus:active{transform:translateY(2px) scale(.99); box-shadow:0 4px 12px rgba(31,157,87,.34);}
+  .plus.lock{background:var(--gray); box-shadow:none;}
+  .plus .p{font-size:46px; line-height:1;}
+  .undo{flex:0 0 84px; background:#fff; border:2px solid var(--line); border-radius:18px; color:var(--ink); font-weight:800; font-size:14px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;}
+  .undo .ic{font-size:24px;}
+  .undo:disabled{opacity:.4;}
+
+  /* ===== ROSTER VIEW ===== */
+  .datenav{display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:12px;}
+  .datenav .arr{width:46px; height:46px; border-radius:12px; background:#fff; border:1.5px solid var(--line); font-size:22px; font-weight:800; display:flex; align-items:center; justify-content:center;}
+  .datenav .lbl{flex:1; text-align:center;}
+  .datenav .lbl .d1{font-weight:900; font-size:16px;}
+  .datenav .lbl .d2{font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--ink2); font-weight:800;}
+  .datenav .lbl.today .d1{color:var(--grn);}
+
+  .rcard{padding:14px 14px; margin-bottom:10px; display:flex; gap:12px; align-items:center;}
+  .rcard .left{flex:1; min-width:0;}
+  .rcard .nm{font-weight:900; font-size:17px; display:flex; align-items:center; gap:8px;}
+  .rcard .nm .jersey{font-family:var(--num); font-size:12px; background:var(--gray-bg); color:var(--ink2); border-radius:6px; padding:1px 7px;}
+  .status{display:inline-flex; align-items:center; gap:6px; border-radius:999px; padding:4px 10px; font-weight:800; font-size:12px; margin-top:7px;}
+  .status .dot{width:8px;height:8px;border-radius:50%;}
+  .s-avail{background:var(--grn-bg); color:#137a41;} .s-avail .dot{background:var(--grn);}
+  .s-low{background:var(--amb-bg); color:#9a5d08;} .s-low .dot{background:var(--amb);}
+  .s-rest{background:var(--gray-bg); color:#5b6070;} .s-rest .dot{background:var(--gray);}
+  .s-max{background:var(--red-bg); color:#a82a2a;} .s-max .dot{background:var(--red);}
+  .rmeta{margin-top:8px; display:flex; gap:14px; flex-wrap:wrap;}
+  .rmeta .m{font-size:11.5px; color:var(--ink2); font-weight:700;}
+  .rmeta .m .v{font-family:var(--num); color:var(--ink); font-weight:700;}
+  .capring{flex:0 0 auto; text-align:center; width:64px;}
+  .capring .ringnum{font-family:var(--num); font-weight:700; font-size:26px; line-height:1;}
+  .capring .rlab{font-size:9px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink2); font-weight:800; margin-top:2px;}
+  .bar{height:7px; border-radius:5px; background:var(--gray-bg); margin-top:9px; overflow:hidden;}
+  .bar > i{display:block; height:100%; border-radius:5px;}
+
+  /* ===== GAMES / SETUP lists ===== */
+  .litem{display:flex; align-items:center; gap:12px; padding:14px; border-bottom:1px solid var(--line);}
+  .litem:last-child{border-bottom:none;}
+  .litem .li-main{flex:1; min-width:0;}
+  .litem .li-t{font-weight:800; font-size:15px;}
+  .litem .li-s{font-size:12px; color:var(--ink2); margin-top:2px;}
+  .litem .li-n{font-family:var(--num); font-weight:700; font-size:18px; color:var(--gold-d);}
+  .chev{color:var(--gray); font-size:20px;}
+  .tag{display:inline-block; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; background:var(--gold); color:var(--ink); border-radius:6px; padding:2px 7px; margin-left:6px;}
+  .tag.live{background:var(--grn); color:#fff;}
+
+  .gentry{display:flex; align-items:center; gap:12px; padding:11px 14px; border-bottom:1px solid var(--line);}
+  .gentry:last-child{border-bottom:none;}
+  .gentry .gn{flex:1; font-weight:800; font-size:15px;}
+  .gentry .gn small{display:block; font-weight:600; color:var(--ink2); font-size:11px;}
+  .stepper{display:flex; align-items:center; gap:8px;}
+  .stepper button{width:38px;height:38px;border-radius:10px;border:1.5px solid var(--line);background:#fff;font-size:20px;font-weight:800;display:flex;align-items:center;justify-content:center;}
+  .stepper .val{font-family:var(--num); font-weight:700; font-size:20px; min-width:38px; text-align:center;}
+
+  /* bottom nav */
+  nav.tabs{position:fixed; left:0; right:0; bottom:0; z-index:40; background:var(--panel); border-top:1px solid var(--line); display:flex; max-width:520px; margin:0 auto; padding-bottom:var(--safe-b); box-shadow:0 -4px 16px rgba(22,35,63,.06);}
+  nav.tabs button{flex:1; padding:9px 4px 8px; display:flex; flex-direction:column; align-items:center; gap:3px; color:var(--gray); font-weight:800; font-size:10.5px; text-transform:uppercase; letter-spacing:.05em;}
+  nav.tabs button .ic{font-size:21px; line-height:1;}
+  nav.tabs button.on{color:var(--ink);}
+  nav.tabs button.on .ic{transform:translateY(-1px);}
+
+  /* sheet/modal */
+  .scrim{position:fixed; inset:0; background:rgba(22,35,63,.5); z-index:50; display:none; align-items:flex-end; justify-content:center;}
+  .scrim.show{display:flex; animation:fade .15s ease;}
+  .sheet{background:var(--bg); width:100%; max-width:520px; border-radius:20px 20px 0 0; padding:18px 16px calc(20px + var(--safe-b)); max-height:90vh; overflow:auto; animation:up .22s cubic-bezier(.2,.8,.2,1);}
+  @keyframes up{from{transform:translateY(40px)} to{transform:none}}
+  .sheet h3{margin:2px 0 16px; font-size:18px;}
+  .sheet .x{position:absolute;}
+  .seg{display:flex; gap:6px; background:var(--gray-bg); padding:5px; border-radius:12px; margin-bottom:6px;}
+  .seg button{flex:1; padding:11px 6px; border-radius:9px; font-weight:800; font-size:13px; color:var(--ink2);}
+  .seg button.on{background:#fff; color:var(--ink); box-shadow:var(--shadow);}
+  .hint{font-size:11.5px; color:var(--ink2); margin-top:-4px; margin-bottom:12px; line-height:1.45;}
+  .toast{position:fixed; bottom:calc(140px + var(--safe-b)); left:50%; transform:translateX(-50%); background:var(--ink); color:#fff; padding:11px 18px; border-radius:999px; font-weight:700; font-size:13.5px; z-index:60; opacity:0; pointer-events:none; transition:opacity .2s, transform .2s; white-space:nowrap;}
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(-4px);}
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="top">
+    <div class="brand"><span class="seam"></span> DUGOUT COUNT</div>
+    <div class="ctx" id="ctxBar"></div>
+  </header>
+
+  <main>
+    <!-- COUNT -->
+    <section class="view" id="v-count"></section>
+    <!-- ROSTER -->
+    <section class="view" id="v-roster"></section>
+    <!-- GAMES -->
+    <section class="view" id="v-games"></section>
+    <!-- SETUP -->
+    <section class="view" id="v-setup"></section>
+  </main>
+
+  <div class="countpad" id="countpad" style="display:none">
+    <div class="inner">
+      <button class="undo" id="undoBtn" onclick="undoPitch()"><span class="ic">↶</span>Undo</button>
+      <button class="plus" id="plusBtn" onclick="addPitch()"><span class="p">＋</span>PITCH</button>
+    </div>
+  </div>
+
+  <nav class="tabs">
+    <button data-tab="count" class="on" onclick="go('count')"><span class="ic">⚾</span>Count</button>
+    <button data-tab="roster" onclick="go('roster')"><span class="ic">👥</span>Roster</button>
+    <button data-tab="games" onclick="go('games')"><span class="ic">🗓️</span>Games</button>
+    <button data-tab="setup" onclick="go('setup')"><span class="ic">⚙️</span>Setup</button>
+  </nav>
+</div>
+
+<div class="scrim" id="scrim" onclick="if(event.target===this)closeSheet()">
+  <div class="sheet" id="sheet"></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+/* ===================== persistence (offline, device-local) ===================== */
+const Store = (()=>{
+  let mem=null, ok=false;
+  try{ const k="__t"; localStorage.setItem(k,"1"); localStorage.removeItem(k); ok=true; }catch(e){ ok=false; }
+  return {
+    persists: ok,
+    load(){ if(ok){ try{ return JSON.parse(localStorage.getItem("dugoutCount")||"null"); }catch(e){ return null; } } return mem; },
+    save(d){ const s=JSON.stringify(d); if(ok){ try{ localStorage.setItem("dugoutCount",s); return; }catch(e){} } mem=JSON.parse(s); }
+  };
+})();
+
+/* ===================== model ===================== */
+const REST = {
+  "8U-12U":[{thru:40,days:0},{thru:60,days:1},{thru:85,days:2}],
+  "13U-18U":[{thru:40,days:0},{thru:60,days:1},{thru:85,days:2},{thru:9999,days:3}]
+};
+function restDaysFor(div,count){
+  if(count<=0) return 0;
+  const r=REST[div]; for(const t of r){ if(count<=t.thru) return t.days; } return r[r.length-1].days;
+}
+function defaultLimits(div, periodDays){
+  if(div==="8U-12U") return {daily:85, tourney:105};
+  // 13U-18U
+  const t = periodDays>=3 ? 150 : (periodDays===2 ? 125 : 105);
+  return {daily:105, tourney:t};
+}
+let DB = Store.load() || seed();
+function seed(){ return {version:1, pitchers:{}, tournaments:{}, ui:{tid:null, gid:null, planDate:null}}; }
+function save(){ Store.save(DB); }
+function uid(p){ return p+Math.random().toString(36).slice(2,8)+Date.now().toString(36).slice(-3); }
+
+/* ===================== date helpers ===================== */
+function todayStr(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function pd(s){ return new Date(s+"T12:00:00"); }
+function daysBetween(a,b){ return Math.round((pd(b)-pd(a))/86400000); }
+function addDays(s,n){ const d=pd(s); d.setDate(d.getDate()+n); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function fmtDate(s){ const d=pd(s); return d.toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"}); }
+function fmtShort(s){ const d=pd(s); return d.toLocaleDateString(undefined,{month:"short",day:"numeric"}); }
+
+/* ===================== selectors ===================== */
+function curT(){ return DB.tournaments[DB.ui.tid]||null; }
+function curG(){ const t=curT(); return t&&t.games[DB.ui.gid] ? t.games[DB.ui.gid] : null; }
+function tournamentPitchers(t){ return (t.rosterIds||Object.keys(DB.pitchers)).map(id=>DB.pitchers[id]).filter(Boolean); }
+function planDate(){ return DB.ui.planDate || todayStr(); }
+
+// per-date totals for a pitcher across all games in tournament
+function dateTotals(t, pid){
+  const m={};
+  for(const g of Object.values(t.games)){
+    const c=(g.counts&&g.counts[pid])||0;
+    if(c>0) m[g.date]=(m[g.date]||0)+c;
+  }
+  return m;
+}
+function eventTotal(t, pid){
+  let s=0; for(const g of Object.values(t.games)){ s+=(g.counts&&g.counts[pid])||0; } return s;
+}
+function dayTotal(t, pid, date){
+  let s=0; for(const g of Object.values(t.games)){ if(g.date===date) s+=(g.counts&&g.counts[pid])||0; } return s;
+}
+
+// availability for a pitcher on a given plan date
+function statusFor(t, pid, date){
+  const dt = dateTotals(t, pid);
+  const evt = Object.values(dt).reduce((a,b)=>a+b,0);
+  const today = dt[date]||0;
+  const evtRemain = Math.max(0, t.tournamentLimit - evt);
+  const dayRemain = Math.max(0, t.dailyLimit - today);
+
+  // tournament cap
+  if(evt >= t.tournamentLimit){
+    return {key:"max", label:"Tourney max", cls:"s-max", today, evt, evtRemain:0, dayRemain:0, cap:0, back:null, dt};
+  }
+  // rest from prior outings (strictly before date)
+  let back=null;
+  for(const d in dt){
+    if(d < date && dt[d]>0){
+      const r = restDaysFor(t.division, dt[d]);
+      const ready = addDays(d, r+1);          // first eligible day
+      if(date < ready){ if(!back || ready>back) back=ready; }
+    }
+  }
+  if(back){
+    return {key:"rest", label:"Resting", cls:"s-rest", today, evt, evtRemain, dayRemain, cap:0, back, dt};
+  }
+  if(today >= t.dailyLimit){
+    return {key:"daymax", label:"Day max", cls:"s-max", today, evt, evtRemain, dayRemain:0, cap:0, back:null, dt};
+  }
+  const cap = Math.min(dayRemain, evtRemain);
+  const low = cap <= Math.max(15, Math.round(t.dailyLimit*0.25));
+  return {key:"avail", label: today>0?"In use":"Available", cls: low?"s-low":"s-avail", today, evt, evtRemain, dayRemain, cap, back:null, dt};
+}
+
+/* ===================== UI plumbing ===================== */
+let tab="count";
+function go(t){ tab=t; render(); }
+function render(){
+  document.querySelectorAll("nav.tabs button").forEach(b=>b.classList.toggle("on", b.dataset.tab===tab));
+  document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
+  document.getElementById("v-"+tab).classList.add("active");
+  document.getElementById("countpad").style.display = (tab==="count" && curG() && DB.ui.selPid) ? "block":"none";
+  renderCtx();
+  if(tab==="count") renderCount();
+  if(tab==="roster") renderRoster();
+  if(tab==="games") renderGames();
+  if(tab==="setup") renderSetup();
+}
+function renderCtx(){
+  const t=curT(), g=curG(); const el=document.getElementById("ctxBar"); let h="";
+  if(t){
+    h+=`<span class="pill"><span class="lbl">Event</span> <b>${esc(t.name)}</b></span>`;
+    h+=`<span class="pill">${t.division} · ${t.dailyLimit}/day · ${t.tournamentLimit}/event</span>`;
+    if(tab==="count"){
+      h+= g ? `<span class="pill"><span class="lbl">Game</span> ${esc(g.name)} · ${fmtShort(g.date)}</span>`
+            : `<span class="pill">No game selected</span>`;
+    }
+  } else {
+    h=`<span class="pill">No event yet — open Setup</span>`;
+  }
+  el.innerHTML=h;
+}
+function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function toast(m){ const t=document.getElementById("toast"); t.textContent=m; t.classList.add("show"); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove("show"),1500); }
+function buzz(ms){ try{ if(navigator.vibrate) navigator.vibrate(ms); }catch(e){} }
+
+/* ===================== COUNT VIEW ===================== */
+function renderCount(){
+  const el=document.getElementById("v-count"); const t=curT();
+  if(!t){ el.innerHTML = emptyState("⚾","No event set up","Create a tournament in Setup to start counting."); return; }
+  const g=curG();
+  if(!g){
+    el.innerHTML = emptyState("🗓️","No game selected","Add or pick a game in the Games tab, then come back to count.");
+    return;
+  }
+  const ps = tournamentPitchers(t);
+  if(!ps.length){ el.innerHTML = emptyState("👥","No pitchers yet","Add pitchers to your roster in Setup."); return; }
+  if(!DB.ui.selPid || !DB.pitchers[DB.ui.selPid]) DB.ui.selPid = ps[0].id;
+
+  let chips = `<div class="picker">`;
+  for(const p of ps){
+    const inGame=(g.counts&&g.counts[p.id])||0;
+    chips += `<button class="pchip ${p.id===DB.ui.selPid?"sel":""}" onclick="selPitcher('${p.id}')">${esc(p.name)} <span class="n">${inGame}</span></button>`;
+  }
+  chips += `</div>`;
+
+  const p = DB.pitchers[DB.ui.selPid];
+  const inGame=(g.counts&&g.counts[p.id])||0;
+  const day = dayTotal(t, p.id, g.date);
+  const evt = eventTotal(t, p.id);
+  const rest = restDaysFor(t.division, day);
+  const overDay = day>t.dailyLimit, overEvt = evt>t.tournamentLimit;
+  const warnDay = day>=t.dailyLimit*0.88;
+  const numcls = (overDay||overEvt)?"over":(warnDay?"warn":"");
+
+  // next rest tier
+  const tiers=REST[t.division];
+  let nextTier=null;
+  for(const ti of tiers){ if(day<=ti.thru){ if(ti.thru<9000 && day<ti.thru){ nextTier={at:ti.thru+1, days:(restDaysFor(t.division,ti.thru+1))}; } break; } }
+  // actually compute next jump: smallest threshold boundary above current day count
+  nextTier=null;
+  let prevDays=rest;
+  for(const ti of tiers){
+    const boundary=ti.thru+1;
+    if(boundary>day && restDaysFor(t.division,boundary)>rest){ nextTier={at:boundary, days:restDaysFor(t.division,boundary), more:boundary-day}; break; }
+  }
+
+  let restColor = rest>=3?"var(--red)":rest>=2?"var(--amb)":rest>=1?"var(--gold-d)":"var(--grn)";
+
+  el.innerHTML = chips + `
+    <div class="panel countcard">
+      <div class="who">${esc(p.name)}${p.number?` <span class="muted num">#${esc(p.number)}</span>`:""}</div>
+      <div class="gtag">${esc(g.name)} · this game</div>
+      <div class="bignum num ${numcls}">${inGame}</div>
+      <div class="restline">If pulled now: <span class="b" style="color:${restColor}">${rest} day${rest===1?"":"s"} rest</span></div>
+      <div class="tiers">
+        <div class="tier day"><div class="t1">Day total</div><div class="t2 ${day>t.dailyLimit?"":""}" style="color:${day>=t.dailyLimit?'var(--red)':'var(--ink)'}">${day}<span class="muted" style="font-size:12px">/${t.dailyLimit}</span></div></div>
+        <div class="tier evt"><div class="t1">Event total</div><div class="t2" style="color:${evt>=t.tournamentLimit?'var(--red)':'var(--gold-d)'}">${evt}<span class="muted" style="font-size:12px">/${t.tournamentLimit}</span></div></div>
+      </div>
+      ${nextTier ? `<div class="nexttier">${nextTier.more} more pitch${nextTier.more===1?"":"es"} (at <b>${nextTier.at}</b>) → <b>${nextTier.days} days rest</b></div>`
+                 : (rest>=3?`<div class="nexttier">Max rest tier reached</div>`:``)}
+      ${overDay?`<div class="nexttier" style="color:var(--red);font-weight:800">⚠ Over daily limit</div>`:""}
+      ${overEvt?`<div class="nexttier" style="color:var(--red);font-weight:800">⚠ Over event limit</div>`:""}
+    </div>
+    <div style="height:6px"></div>
+    <button class="btn ghost block" onclick="manualEntry('${p.id}')">Edit count manually</button>
+  `;
+
+  // wire fixed pad
+  const plus=document.getElementById("plusBtn");
+  plus.classList.toggle("lock", false);
+  document.getElementById("undoBtn").disabled = inGame<=0;
+}
+function selPitcher(id){ DB.ui.selPid=id; save(); render(); }
+function addPitch(){
+  const t=curT(), g=curG(); if(!t||!g||!DB.ui.selPid) return;
+  g.counts=g.counts||{}; g.counts[DB.ui.selPid]=(g.counts[DB.ui.selPid]||0)+1;
+  buzz(12); save(); renderCount(); renderCtx();
+}
+function undoPitch(){
+  const g=curG(); if(!g||!DB.ui.selPid) return;
+  g.counts=g.counts||{}; if(g.counts[DB.ui.selPid]>0){ g.counts[DB.ui.selPid]--; buzz(8); save(); renderCount(); }
+}
+function manualEntry(pid){
+  const t=curT(), g=curG(); const cur=(g.counts&&g.counts[pid])||0;
+  openSheet(`<h3>Set count — ${esc(DB.pitchers[pid].name)}</h3>
+    <div class="hint">Pitches for <b>${esc(g.name)}</b> only.</div>
+    <div class="field"><label>Pitches this game</label><input type="number" id="meVal" inputmode="numeric" value="${cur}" min="0"></div>
+    <button class="btn primary block" onclick="saveManual('${pid}')">Save</button>`);
+}
+function saveManual(pid){
+  const v=Math.max(0, parseInt(document.getElementById("meVal").value||"0",10));
+  const g=curG(); g.counts=g.counts||{}; g.counts[pid]=v; save(); closeSheet(); render(); toast("Count saved");
+}
+
+/* ===================== ROSTER (planning) ===================== */
+function renderRoster(){
+  const el=document.getElementById("v-roster"); const t=curT();
+  if(!t){ el.innerHTML=emptyState("👥","No event set up","Create a tournament in Setup first."); return; }
+  const date=planDate(); const isToday=date===todayStr();
+  const ps=tournamentPitchers(t);
+  const rows = ps.map(p=>({p, s:statusFor(t,p.id,date)}));
+  const order={avail:0, daymax:1, rest:2, max:3};
+  rows.sort((a,b)=> (order[a.s.key]-order[b.s.key]) || (b.s.cap-a.s.cap) || a.p.name.localeCompare(b.p.name));
+
+  const availCount = rows.filter(r=>r.s.key==="avail").length;
+
+  let cards = rows.map(({p,s})=>{
+    const dayPct=Math.min(100, Math.round(s.today/t.dailyLimit*100));
+    const evtPct=Math.min(100, Math.round(s.evt/t.tournamentLimit*100));
+    const barColor = s.key==="avail" ? "var(--grn)" : s.key==="rest" ? "var(--gray)" : "var(--red)";
+    let sub="";
+    if(s.key==="rest") sub=`<div class="rmeta"><span class="m">Back: <span class="v">${fmtShort(s.back)}</span> (${daysBetween(date,s.back)} day${daysBetween(date,s.back)===1?"":"s"})</span></div>`;
+    else if(s.key==="max") sub=`<div class="rmeta"><span class="m" style="color:var(--red)">Event limit reached</span></div>`;
+    else if(s.key==="daymax") sub=`<div class="rmeta"><span class="m" style="color:var(--red)">Daily limit reached — event has ${s.evtRemain} left</span></div>`;
+    const ringNum = s.key==="avail" ? s.cap : (s.key==="rest" ? "💤" : "0");
+    const ringColor = s.key==="avail" ? (s.cls==="s-low"?"var(--amb)":"var(--grn)") : (s.key==="rest"?"var(--gray)":"var(--red)");
+    return `<div class="panel rcard">
+      <div class="left">
+        <div class="nm">${esc(p.name)} ${p.number?`<span class="jersey num">#${esc(p.number)}</span>`:""}</div>
+        <span class="status ${s.cls}"><span class="dot"></span>${s.label}${s.key==="avail"&&s.today>0?` · ${s.today} today`:""}</span>
+        ${sub}
+        <div class="rmeta">
+          <span class="m">Day <span class="v">${s.today}</span>/${t.dailyLimit}</span>
+          <span class="m">Event <span class="v">${s.evt}</span>/${t.tournamentLimit}</span>
+        </div>
+        <div class="bar"><i style="width:${evtPct}%;background:${barColor}"></i></div>
+      </div>
+      <div class="capring">
+        <div class="ringnum" style="color:${ringColor}">${ringNum}</div>
+        <div class="rlab">${s.key==="avail"?"can throw":s.key==="rest"?"resting":"maxed"}</div>
+      </div>
+    </div>`;
+  }).join("");
+  if(!ps.length) cards=emptyState("👥","No pitchers","Add pitchers in Setup.");
+
+  el.innerHTML = `
+    <div class="panel" style="padding:10px 10px; margin-bottom:14px">
+      <div class="datenav">
+        <button class="arr" onclick="shiftPlan(-1)">‹</button>
+        <div class="lbl ${isToday?"today":""}">
+          <div class="d1">${fmtDate(date)}</div>
+          <div class="d2">${isToday?"Today":"Planning day"}${availCount?` · ${availCount} available`:""}</div>
+        </div>
+        <button class="arr" onclick="shiftPlan(1)">›</button>
+      </div>
+    </div>
+    ${cards}
+    <div class="muted" style="text-align:center;margin:10px 4px 0">Rest is calculated from prior outings this event. Use ‹ › to plan tomorrow's arms.</div>
+  `;
+}
+function shiftPlan(n){ DB.ui.planDate=addDays(planDate(),n); save(); renderRoster(); }
+
+/* ===================== GAMES ===================== */
+function renderGames(){
+  const el=document.getElementById("v-games"); const t=curT();
+  if(!t){ el.innerHTML=emptyState("🗓️","No event set up","Create a tournament in Setup first."); return; }
+  const games=Object.values(t.games).sort((a,b)=> a.date<b.date?-1:a.date>b.date?1:(a.created-b.created));
+  let list = games.length ? `<div class="panel">`+games.map(g=>{
+    const total=Object.values(g.counts||{}).reduce((a,b)=>a+b,0);
+    const live = g.id===DB.ui.gid;
+    return `<div class="litem" onclick="openGame('${g.id}')">
+      <div class="li-main">
+        <div class="li-t">${esc(g.name)}${live?`<span class="tag live">Active</span>`:""}</div>
+        <div class="li-s">${fmtDate(g.date)} · ${Object.values(g.counts||{}).filter(x=>x>0).length} pitchers used</div>
+      </div>
+      <div class="li-n">${total}</div><span class="chev">›</span>
+    </div>`;
+  }).join("")+`</div>` : emptyState("🗓️","No games yet","Add your first game to start tracking.");
+
+  el.innerHTML = `
+    <div class="sect-h"><h2>Games — ${esc(t.name)}</h2></div>
+    ${list}
+    <div style="height:12px"></div>
+    <button class="btn gold block" onclick="newGame()">＋ Add game</button>
+  `;
+}
+function newGame(){
+  const t=curT();
+  openSheet(`<h3>Add game</h3>
+    <div class="field"><label>Game name</label><input type="text" id="gName" placeholder="e.g. Pool Game 1 vs Storm"></div>
+    <div class="field"><label>Date</label><input type="date" id="gDate" value="${todayStr()}"></div>
+    <button class="btn primary block" onclick="saveGame()">Add game</button>`);
+  setTimeout(()=>document.getElementById("gName").focus(),60);
+}
+function saveGame(){
+  const t=curT(); const name=(document.getElementById("gName").value||"").trim()||("Game "+(Object.keys(t.games).length+1));
+  const date=document.getElementById("gDate").value||todayStr();
+  const id=uid("g"); t.games[id]={id,name,date,counts:{},created:Date.now()};
+  DB.ui.gid=id; save(); closeSheet(); toast("Game added — now active"); go("count");
+}
+function openGame(gid){
+  const t=curT(); const g=t.games[gid];
+  const ps=tournamentPitchers(t);
+  let rows = ps.map(p=>{
+    const c=(g.counts&&g.counts[p.id])||0;
+    return `<div class="gentry">
+      <div class="gn">${esc(p.name)}${p.number?` <small>#${esc(p.number)}</small>`:""}</div>
+      <div class="stepper">
+        <button onclick="gStep('${gid}','${p.id}',-1)">−</button>
+        <span class="val" id="gv-${p.id}">${c}</span>
+        <button onclick="gStep('${gid}','${p.id}',1)">＋</button>
+      </div>
+    </div>`;
+  }).join("");
+  if(!ps.length) rows=`<div class="empty">No pitchers. Add some in Setup.</div>`;
+  openSheet(`<h3>${esc(g.name)}</h3>
+    <div class="hint">${fmtDate(g.date)} · tap ＋ / − to enter or correct pitch totals for this game.</div>
+    <div class="panel" style="margin-bottom:14px">${rows}</div>
+    <div class="row" style="margin-bottom:10px">
+      ${g.id===DB.ui.gid?`<button class="btn primary" onclick="closeSheet();go('count')">Count live</button>`:`<button class="btn gold" onclick="makeActive('${gid}')">Make active</button>`}
+      <button class="btn ghost" onclick="editGame('${gid}')">Rename / date</button>
+    </div>
+    <button class="btn danger block" onclick="delGame('${gid}')">Delete game</button>`);
+}
+function gStep(gid,pid,n){
+  const t=curT(); const g=t.games[gid]; g.counts=g.counts||{};
+  g.counts[pid]=Math.max(0,(g.counts[pid]||0)+n); save();
+  document.getElementById("gv-"+pid).textContent=g.counts[pid];
+}
+function makeActive(gid){ DB.ui.gid=gid; save(); closeSheet(); toast("Game is now active"); go("count"); }
+function editGame(gid){
+  const t=curT(); const g=t.games[gid];
+  openSheet(`<h3>Edit game</h3>
+    <div class="field"><label>Game name</label><input type="text" id="gName" value="${esc(g.name)}"></div>
+    <div class="field"><label>Date</label><input type="date" id="gDate" value="${g.date}"></div>
+    <button class="btn primary block" onclick="saveEditGame('${gid}')">Save</button>`);
+}
+function saveEditGame(gid){
+  const t=curT(); const g=t.games[gid];
+  g.name=(document.getElementById("gName").value||"").trim()||g.name;
+  g.date=document.getElementById("gDate").value||g.date; save(); closeSheet(); render(); toast("Saved");
+}
+function delGame(gid){
+  const t=curT();
+  if(!confirm("Delete this game and its pitch counts?")) return;
+  delete t.games[gid]; if(DB.ui.gid===gid) DB.ui.gid=Object.keys(t.games)[0]||null;
+  save(); closeSheet(); render();
+}
+
+/* ===================== SETUP ===================== */
+function renderSetup(){
+  const el=document.getElementById("v-setup");
+  const ts=Object.values(DB.tournaments).sort((a,b)=>b.created-a.created);
+  const t=curT();
+
+  let tlist = ts.length ? `<div class="panel">`+ts.map(x=>`
+    <div class="litem" onclick="selectTournament('${x.id}')">
+      <div class="li-main">
+        <div class="li-t">${esc(x.name)}${x.id===DB.ui.tid?`<span class="tag">Selected</span>`:""}</div>
+        <div class="li-s">${x.division} · ${x.dailyLimit}/day · ${x.tournamentLimit}/event · ${Object.keys(x.games).length} games</div>
+      </div><span class="chev">›</span>
+    </div>`).join("")+`</div>` : `<div class="muted" style="margin:0 2px 12px">No tournaments yet.</div>`;
+
+  // pitchers
+  const ps=Object.values(DB.pitchers).sort((a,b)=>a.name.localeCompare(b.name));
+  let plist = ps.length ? `<div class="panel">`+ps.map(p=>`
+    <div class="litem">
+      <div class="li-main"><div class="li-t">${esc(p.name)} ${p.number?`<span class="muted num">#${esc(p.number)}</span>`:""}</div></div>
+      <button class="btn ghost" style="padding:8px 12px" onclick="editPitcher('${p.id}')">Edit</button>
+    </div>`).join("")+`</div>` : `<div class="muted" style="margin:0 2px 12px">No pitchers yet.</div>`;
+
+  el.innerHTML = `
+    <div class="sect-h"><h2>Tournaments / Events</h2></div>
+    ${tlist}
+    <button class="btn gold block" style="margin:12px 0 22px" onclick="newTournament()">＋ New event</button>
+
+    ${t?`<div class="sect-h"><h2>Selected: ${esc(t.name)}</h2><button class="btn ghost" style="padding:7px 12px;font-size:13px" onclick="editTournament('${t.id}')">Edit rules</button></div>
+      <div class="panel" style="padding:14px;margin-bottom:22px">
+        <div class="rmeta" style="margin:0">
+          <span class="m">Division <span class="v">${t.division}</span></span>
+          <span class="m">Period <span class="v">${t.periodDays}-day</span></span>
+          <span class="m">Daily cap <span class="v">${t.dailyLimit}</span></span>
+          <span class="m">Event cap <span class="v">${t.tournamentLimit}</span></span>
+        </div>
+      </div>`:""}
+
+    <div class="sect-h"><h2>Pitchers (shared roster)</h2></div>
+    ${plist}
+    <button class="btn gold block" style="margin:12px 0 22px" onclick="newPitcher()">＋ Add pitcher</button>
+
+    <div class="sect-h"><h2>Data</h2></div>
+    <div class="row" style="margin-bottom:10px">
+      <button class="btn ghost" onclick="exportData()">⬇ Backup</button>
+      <button class="btn ghost" onclick="document.getElementById('importFile').click()">⬆ Restore</button>
+    </div>
+    <input type="file" id="importFile" accept="application/json" style="display:none" onchange="importData(this)">
+    <div class="muted">${Store.persists?"✓ Saved on this device — works offline.":"⚠ This preview won't save between reloads. Download the file and open it from your phone to keep data."}</div>
+    <div style="height:10px"></div>
+  `;
+}
+function selectTournament(id){ DB.ui.tid=id; const t=DB.tournaments[id]; DB.ui.gid=Object.keys(t.games)[0]||null; DB.ui.planDate=null; save(); toast("Event selected"); go("count"); }
+
+function newTournament(){ tournamentSheet(null); }
+function editTournament(id){ tournamentSheet(id); }
+function tournamentSheet(id){
+  const t = id?DB.tournaments[id]:null;
+  const div = t?t.division:"8U-12U";
+  const period = t?t.periodDays:2;
+  openSheet(`<h3>${t?"Edit event":"New event"}</h3>
+    <div class="field"><label>Event name</label><input type="text" id="tName" value="${t?esc(t.name):""}" placeholder="e.g. Memorial Day Classic"></div>
+    <div class="field"><label>Division</label>
+      <div class="seg" id="tDiv">
+        <button class="${div==="8U-12U"?"on":""}" data-v="8U-12U" onclick="pickSeg('tDiv',this);syncLimits()">8U–12U</button>
+        <button class="${div==="13U-18U"?"on":""}" data-v="13U-18U" onclick="pickSeg('tDiv',this);syncLimits()">13U–18U</button>
+      </div></div>
+    <div class="field"><label>Tournament length</label>
+      <div class="seg" id="tPeriod">
+        <button class="${period===1?"on":""}" data-v="1" onclick="pickSeg('tPeriod',this);syncLimits()">1 day</button>
+        <button class="${period===2?"on":""}" data-v="2" onclick="pickSeg('tPeriod',this);syncLimits()">2 day</button>
+        <button class="${period===3?"on":""}" data-v="3" onclick="pickSeg('tPeriod',this);syncLimits()">3 day</button>
+      </div></div>
+    <div class="row">
+      <div class="field"><label>Daily limit</label><input type="number" id="tDaily" inputmode="numeric" value="${t?t.dailyLimit:85}"></div>
+      <div class="field"><label>Event limit</label><input type="number" id="tEvent" inputmode="numeric" value="${t?t.tournamentLimit:105}"></div>
+    </div>
+    <div class="hint">Defaults follow standard travel-ball caps and the rest-day table for the division. You can override either limit. Rest-day requirements always use the division table.</div>
+    <button class="btn primary block" onclick="saveTournament(${t?`'${t.id}'`:"null"})">${t?"Save changes":"Create event"}</button>
+    ${t?`<button class="btn danger block" style="margin-top:10px" onclick="delTournament('${t.id}')">Delete event</button>`:""}`);
+  setTimeout(()=>{ if(!t) document.getElementById("tName").focus(); },60);
+}
+function pickSeg(group,btn){ document.querySelectorAll("#"+group+" button").forEach(b=>b.classList.remove("on")); btn.classList.add("on"); }
+function segVal(group){ const b=document.querySelector("#"+group+" button.on"); return b?b.dataset.v:null; }
+function syncLimits(){
+  const div=segVal("tDiv"); const period=parseInt(segVal("tPeriod")||"2",10);
+  const d=defaultLimits(div,period);
+  document.getElementById("tDaily").value=d.daily;
+  document.getElementById("tEvent").value=d.tourney;
+}
+function saveTournament(id){
+  const name=(document.getElementById("tName").value||"").trim()||"Untitled Event";
+  const division=segVal("tDiv"); const periodDays=parseInt(segVal("tPeriod"),10);
+  const dailyLimit=Math.max(1,parseInt(document.getElementById("tDaily").value||"85",10));
+  const tournamentLimit=Math.max(1,parseInt(document.getElementById("tEvent").value||"105",10));
+  if(id){ const t=DB.tournaments[id]; Object.assign(t,{name,division,periodDays,dailyLimit,tournamentLimit}); }
+  else{
+    const nid=uid("t");
+    DB.tournaments[nid]={id:nid,name,division,periodDays,dailyLimit,tournamentLimit,
+      rosterIds:Object.keys(DB.pitchers), games:{}, created:Date.now()};
+    DB.ui.tid=nid; DB.ui.gid=null; DB.ui.planDate=null;
+  }
+  save(); closeSheet(); render(); toast(id?"Event updated":"Event created");
+}
+function delTournament(id){
+  if(!confirm("Delete this event and all its games?")) return;
+  delete DB.tournaments[id];
+  if(DB.ui.tid===id){ DB.ui.tid=Object.keys(DB.tournaments)[0]||null; DB.ui.gid= DB.ui.tid?Object.keys(DB.tournaments[DB.ui.tid].games)[0]||null:null; }
+  save(); closeSheet(); render();
+}
+
+function newPitcher(){ pitcherSheet(null); }
+function editPitcher(id){ pitcherSheet(id); }
+function pitcherSheet(id){
+  const p=id?DB.pitchers[id]:null;
+  openSheet(`<h3>${p?"Edit pitcher":"Add pitcher"}</h3>
+    <div class="field"><label>Name</label><input type="text" id="pName" value="${p?esc(p.name):""}" placeholder="First name or nickname"></div>
+    <div class="field"><label>Jersey # (optional)</label><input type="text" id="pNum" inputmode="numeric" value="${p&&p.number?esc(p.number):""}" placeholder="e.g. 12"></div>
+    <button class="btn primary block" onclick="savePitcher(${p?`'${p.id}'`:"null"})">${p?"Save":"Add"}</button>
+    ${p?`<button class="btn danger block" style="margin-top:10px" onclick="delPitcher('${p.id}')">Remove pitcher</button>`:""}`);
+  setTimeout(()=>document.getElementById("pName").focus(),60);
+}
+function savePitcher(id){
+  const name=(document.getElementById("pName").value||"").trim(); if(!name){ toast("Enter a name"); return; }
+  const number=(document.getElementById("pNum").value||"").trim();
+  if(id){ Object.assign(DB.pitchers[id],{name,number}); }
+  else{
+    const nid=uid("p"); DB.pitchers[nid]={id:nid,name,number};
+    // add to every existing tournament roster by default
+    Object.values(DB.tournaments).forEach(t=>{ t.rosterIds=t.rosterIds||[]; if(!t.rosterIds.includes(nid)) t.rosterIds.push(nid); });
+  }
+  save(); closeSheet(); render(); toast(id?"Saved":"Pitcher added");
+}
+function delPitcher(id){
+  if(!confirm("Remove this pitcher? Their recorded counts stay in past games.")) return;
+  delete DB.pitchers[id];
+  Object.values(DB.tournaments).forEach(t=>{ t.rosterIds=(t.rosterIds||[]).filter(x=>x!==id); });
+  if(DB.ui.selPid===id) DB.ui.selPid=null;
+  save(); closeSheet(); render();
+}
+
+/* ===================== backup / restore ===================== */
+function exportData(){
+  const blob=new Blob([JSON.stringify(DB,null,2)],{type:"application/json"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+  a.download="dugout-count-backup-"+todayStr()+".json"; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),2000); toast("Backup downloaded");
+}
+function importData(input){
+  const f=input.files[0]; if(!f) return; const r=new FileReader();
+  r.onload=()=>{ try{ const d=JSON.parse(r.result); if(!d.pitchers||!d.tournaments) throw 0;
+    if(!confirm("Replace all current data with this backup?")) return;
+    DB=d; DB.ui=DB.ui||{}; save(); render(); toast("Data restored");
+  }catch(e){ toast("Couldn't read that file"); } input.value=""; };
+  r.readAsText(f);
+}
+
+/* ===================== sheet ===================== */
+function openSheet(html){ const s=document.getElementById("sheet"); s.innerHTML=html; document.getElementById("scrim").classList.add("show"); }
+function closeSheet(){ document.getElementById("scrim").classList.remove("show"); }
+
+function emptyState(icon,title,sub){ return `<div class="panel empty"><div class="big">${icon}</div><div style="font-weight:900;font-size:17px;margin-bottom:4px">${title}</div><div class="muted">${sub}</div></div>`; }
+
+/* ===================== offline service worker ===================== */
+if("serviceWorker" in navigator){ try{ navigator.serviceWorker.register("sw.js").catch(()=>{}); }catch(e){} }
+
+/* ===================== boot ===================== */
+(function boot(){
+  if(!DB.ui) DB.ui={};
+  if(DB.ui.tid && !DB.tournaments[DB.ui.tid]) DB.ui.tid=Object.keys(DB.tournaments)[0]||null;
+  // first-run starter so the app isn't empty
+  if(Object.keys(DB.tournaments).length===0 && Object.keys(DB.pitchers).length===0){
+    tab="setup";
+  }
+  render();
+})();
+</script>
+</body>
+</html>
